@@ -33,15 +33,19 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:3000/API/login', formData);
+      const response = await axios.post('/api/auth/login', formData);
       
       if (response.data.status) {
-        // Store user data in localStorage or your preferred state management
-        localStorage.setItem('user', JSON.stringify(response.data.data));
-        // Redirect to home page
-        navigate('/', { 
-          state: { message: 'Login successful!' }
-        });
+        // Ambil token dan user dari response.data.data
+        const { token, user } = response.data.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        // Redirect sesuai role
+        if (user.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/user/dashboard');
+        }
       }
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed. Please try again.');
