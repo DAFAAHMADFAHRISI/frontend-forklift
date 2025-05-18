@@ -5,7 +5,8 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
     const [formData, setFormData] = useState({
         nama_unit: '',
         kapasitas: '',
-        status: 'tersedia'
+        status: 'tersedia',
+        harga_per_jam: ''
     });
     const [selectedImage, setSelectedImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -15,18 +16,20 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
     // Base URL for images
     const imageBaseUrl = 'http://localhost:3000/images/';
 
+    // Valid kapasitas values
+    const validKapasitas = ['2.5', '3', '5', '7', '10'];
+
     // Initialize form data when unit prop changes
     useEffect(() => {
         if (unit) {
             setFormData({
                 nama_unit: unit.nama_unit || '',
                 kapasitas: unit.kapasitas || '',
-                status: unit.status || 'tersedia'
+                status: unit.status || 'tersedia',
+                harga_per_jam: unit.harga_per_jam || ''
             });
             
-            // Check if unit has an image
             if (unit.gambar) {
-                // Set the preview to the full image URL
                 setImagePreview(imageBaseUrl + unit.gambar);
             } else {
                 setImagePreview(null);
@@ -45,6 +48,16 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            // Validate file type
+            if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+                setError('Hanya file JPEG, JPG, dan PNG yang diperbolehkan');
+                return;
+            }
+            // Validate file size (2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                setError('Ukuran file maksimal 2MB');
+                return;
+            }
             setSelectedImage(file);
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -56,9 +69,23 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError(null);
         
         if (!unit || !unit.id_unit) {
             setError('Unit ID is missing');
+            return;
+        }
+
+        // Validate kapasitas
+        if (!validKapasitas.includes(formData.kapasitas)) {
+            setError('Kapasitas harus salah satu dari: 2.5, 3, 5, 7, 10');
+            return;
+        }
+
+        // Validate harga_per_jam
+        const harga = parseFloat(formData.harga_per_jam);
+        if (isNaN(harga) || harga < 0) {
+            setError('Harga per jam harus berupa angka positif');
             return;
         }
         
@@ -71,22 +98,29 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
             if (selectedImage) {
                 formDataWithImage.append('gambar', selectedImage);
             }
+
+            // Get token from localStorage
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Authentication required');
+                return;
+            }
             
-            await axios.patch(
-                `http://localhost:3000/API/unit/update/${unit.id_unit}`, 
+            await axios.put(
+                `http://localhost:3000/API/unit/edit/${unit.id_unit}`, 
                 formDataWithImage,
                 {
                     headers: {
-                        'Content-Type': 'multipart/form-data'
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`
                     }
                 }
             );
             
-            // Notify parent component
             onUnitUpdated();
         } catch (err) {
             console.error("Error updating unit:", err);
-            setError('Error updating unit: ' + (err.message || 'Unknown error'));
+            setError(err.response?.data?.message || 'Error updating unit');
         }
     };
 
@@ -122,14 +156,34 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                             <label className="block text-sm font-medium mb-1" htmlFor="kapasitas">
                                 Kapasitas (Ton)
                             </label>
-                            <input
-                                type="text"
+                            <select
                                 id="kapasitas"
                                 name="kapasitas"
                                 value={formData.kapasitas}
                                 onChange={handleInputChange}
                                 className="w-full border px-2 py-1"
                                 required
+                            >
+                                <option value="">Pilih Kapasitas</option>
+                                {validKapasitas.map(kap => (
+                                    <option key={kap} value={kap}>{kap} Ton</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-3">
+                            <label className="block text-sm font-medium mb-1" htmlFor="harga_per_jam">
+                                Harga per Jam (Rp)
+                            </label>
+                            <input
+                                type="number"
+                                id="harga_per_jam"
+                                name="harga_per_jam"
+                                value={formData.harga_per_jam}
+                                onChange={handleInputChange}
+                                className="w-full border px-2 py-1"
+                                required
+                                min="0"
                             />
                         </div>
                         
@@ -146,7 +200,6 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                             >
                                 <option value="tersedia">Tersedia</option>
                                 <option value="disewa">Disewa</option>
-                                <option value="maintenance">Maintenance</option>
                             </select>
                         </div>
                     </div>
@@ -157,7 +210,7 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                         </label>
                         <input
                             type="file"
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/jpg"
                             ref={fileInputRef}
                             onChange={handleImageChange}
                             className="mb-2"

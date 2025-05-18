@@ -103,12 +103,33 @@ const UnitForm = ({ formData, setFormData, imagePreview, selectedImage, handleIm
             <label className="block text-sm font-medium mb-1" htmlFor="kapasitas">
               Kapasitas (Ton)
             </label>
-            <input
-              type="text"
+            <select
               id="kapasitas"
               name="kapasitas"
               value={formData.kapasitas}
               onChange={(e) => setFormData({...formData, kapasitas: e.target.value})}
+              className="w-full border rounded px-2 py-1"
+            >
+              <option value="2.5">2.5</option>
+              <option value="3">3</option>
+              <option value="5">5</option>
+              <option value="7">7</option>
+              <option value="10">10</option>
+            </select>
+          </div>
+          
+          <div className="mb-3">
+            <label className="block text-sm font-medium mb-1" htmlFor="harga_per_jam">
+              Harga per Jam (Rp)
+            </label>
+            <input
+              type="number"
+              id="harga_per_jam"
+              name="harga_per_jam"
+              value={formData.harga_per_jam}
+              onChange={(e) => setFormData({...formData, harga_per_jam: e.target.value})}
+              min="0"
+              step="0.01"
               className="w-full border rounded px-2 py-1"
               required
             />
@@ -127,7 +148,6 @@ const UnitForm = ({ formData, setFormData, imagePreview, selectedImage, handleIm
             >
               <option value="tersedia">Tersedia</option>
               <option value="disewa">Disewa</option>
-              <option value="maintenance">Maintenance</option>
             </select>
           </div>
         </div>
@@ -173,6 +193,8 @@ const UnitForm = ({ formData, setFormData, imagePreview, selectedImage, handleIm
   </div>
 );
 
+const validKapasitas = ['2.5', '3', '5', '7', '10'];
+
 // Main Unit component
 function Unit() {
     const [units, setUnits] = useState([]);
@@ -181,7 +203,8 @@ function Unit() {
     const [formData, setFormData] = useState({
         nama_unit: '',
         kapasitas: '',
-        status: 'tersedia'
+        status: 'tersedia',
+        harga_per_jam: ''
     });
     const [selectedImage, setSelectedImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -198,14 +221,12 @@ function Unit() {
     const fetchUnits = async () => {
         try {
             setLoading(true);
-            let endpoint = `${API_BASE_URL}/unit`;
-            
+            let endpoint = `http://localhost:3000/api/unit`;
             if (viewMode === 'available') {
-                endpoint = `${API_BASE_URL}/unit/available`;
+                endpoint = `http://localhost:3000/api/unit/available`;
             }
-            
-            const response = await axios.get(endpoint);
-            
+            const token = localStorage.getItem('token');
+            const response = await axios.get(endpoint, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             if (response.data && response.data.status) {
                 if (response.data.data) {
                     setUnits(response.data.data);
@@ -235,6 +256,14 @@ function Unit() {
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+                setError('Hanya file JPEG, JPG, dan PNG yang diperbolehkan');
+                return;
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                setError('Ukuran file maksimal 2MB');
+                return;
+            }
             setSelectedImage(file);
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -246,44 +275,57 @@ function Unit() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+        setError(null);
+        if (!validKapasitas.includes(formData.kapasitas)) {
+            setError('Kapasitas harus salah satu dari: 2.5, 3, 5, 7, 10');
+            return;
+        }
+        const harga = parseFloat(formData.harga_per_jam);
+        if (isNaN(harga) || harga < 0) {
+            setError('Harga per jam harus berupa angka positif');
+            return;
+        }
         try {
             const formDataWithImage = new FormData();
             Object.keys(formData).forEach(key => {
                 formDataWithImage.append(key, formData[key]);
             });
-            
             if (selectedImage) {
                 formDataWithImage.append('gambar', selectedImage);
             }
-            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Authentication required');
+                return;
+            }
             if (isEditing) {
-                await axios.patch(
-                    `${API_BASE_URL}/unit/update/${currentId}`, 
+                await axios.put(
+                    `http://localhost:3000/api/unit/edit/${currentId}`,
                     formDataWithImage,
                     {
                         headers: {
-                            'Content-Type': 'multipart/form-data'
+                            'Content-Type': 'multipart/form-data',
+                            'Authorization': `Bearer ${token}`
                         }
                     }
                 );
             } else {
                 await axios.post(
-                    `${API_BASE_URL}/unit/store`, 
+                    `http://localhost:3000/api/unit/store`,
                     formDataWithImage,
                     {
                         headers: {
-                            'Content-Type': 'multipart/form-data'
+                            'Content-Type': 'multipart/form-data',
+                            'Authorization': `Bearer ${token}`
                         }
                     }
                 );
             }
-            
             resetForm();
             fetchUnits();
         } catch (err) {
             console.error("Error saving unit:", err);
-            setError('Error saving unit: ' + (err.message || 'Unknown error'));
+            setError(err.response?.data?.message || 'Error saving unit');
         }
     };
 
@@ -291,7 +333,8 @@ function Unit() {
         setFormData({
             nama_unit: '',
             kapasitas: '',
-            status: 'tersedia'
+            status: 'tersedia',
+            harga_per_jam: ''
         });
         setSelectedImage(null);
         setImagePreview(null);
@@ -307,28 +350,35 @@ function Unit() {
         setFormData({
             nama_unit: unit.nama_unit || '',
             kapasitas: unit.kapasitas || '',
-            status: unit.status || 'tersedia'
+            status: unit.status || 'tersedia',
+            harga_per_jam: unit.harga_per_jam || ''
         });
-        
         if (unit.gambar) {
             setImagePreview(IMAGE_BASE_URL + unit.gambar);
         } else {
             setImagePreview(null);
         }
-        
         setIsEditing(true);
         setCurrentId(unit.id_unit);
         setShowForm(true);
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this unit?')) {
+        if (window.confirm('Yakin ingin menghapus unit ini?')) {
             try {
-                await axios.delete(`${API_BASE_URL}/unit/delete/${id}`);
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    setError('Authentication required');
+                    return;
+                }
+                await axios.delete(`http://localhost:3000/api/unit/${id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
                 fetchUnits();
             } catch (err) {
-                console.error("Error deleting unit:", err);
-                setError('Error deleting unit: ' + (err.message || 'Unknown error'));
+                setError(err.response?.data?.message || 'Gagal menghapus unit');
             }
         }
     };
@@ -427,12 +477,31 @@ function Unit() {
                                     <label htmlFor="kapasitas">
                                         Kapasitas (Ton)
                                     </label>
-                                    <input
-                                        type="text"
+                                    <select
                                         id="kapasitas"
                                         name="kapasitas"
                                         value={formData.kapasitas}
                                         onChange={handleInputChange}
+                                    >
+                                        <option value="2.5">2.5</option>
+                                        <option value="3">3</option>
+                                        <option value="5">5</option>
+                                        <option value="7">7</option>
+                                        <option value="10">10</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="harga_per_jam">
+                                        Harga per Jam (Rp)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        id="harga_per_jam"
+                                        name="harga_per_jam"
+                                        value={formData.harga_per_jam}
+                                        onChange={handleInputChange}
+                                        min="0"
+                                        step="0.01"
                                         required
                                     />
                                 </div>
@@ -449,7 +518,6 @@ function Unit() {
                                     >
                                         <option value="tersedia">Tersedia</option>
                                         <option value="disewa">Disewa</option>
-                                        <option value="maintenance">Maintenance</option>
                                     </select>
                                 </div>
                             </div>
@@ -517,6 +585,7 @@ function Unit() {
                         <th>Gambar</th>
                         <th>Nama Unit</th>
                         <th>Kapasitas (Ton)</th>
+                        <th>Harga per Jam</th>
                         <th>Status</th>
                         <th>Aksi</th>
                     </tr>
@@ -548,10 +617,10 @@ function Unit() {
                                 </td>
                                 <td>{unit.nama_unit}</td>
                                 <td>{unit.kapasitas}</td>
+                                <td>{unit.harga_per_jam}</td>
                                 <td>
                                     <span className={`status-badge status-${unit.status}`}>
-                                        {unit.status === 'tersedia' ? 'Tersedia' : 
-                                        unit.status === 'disewa' ? 'Disewa' : 'Maintenance'}
+                                        {unit.status === 'tersedia' ? 'Tersedia' : 'Disewa'}
                                     </span>
                                 </td>
                                 <td>
@@ -584,12 +653,6 @@ function Unit() {
                                                 >
                                                     ⭐ Set Disewa
                                                 </button>
-                                                <button
-                                                    onClick={() => handleStatusChange(unit.id_unit, 'maintenance')}
-                                                    className="action-button maintenance-button"
-                                                >
-                                                    🔧 Set Maintenance
-                                                </button>
                                             </>
                                         )}
                                     </div>
@@ -598,7 +661,7 @@ function Unit() {
                         ))
                     ) : (
                         <tr>
-                            <td colSpan="6" className="no-data">
+                            <td colSpan="7" className="no-data">
                                 No units found
                             </td>
                         </tr>

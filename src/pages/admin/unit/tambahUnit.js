@@ -5,12 +5,16 @@ function TambahUnit({ onUnitAdded, onCancel }) {
     const [formData, setFormData] = useState({
         nama_unit: '',
         kapasitas: '',
-        status: 'tersedia'
+        status: 'tersedia',
+        harga_per_jam: ''
     });
     const [selectedImage, setSelectedImage] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
     const fileInputRef = useRef(null);
     const [error, setError] = useState(null);
+
+    // Valid kapasitas values
+    const validKapasitas = ['2.5', '3', '5', '7', '10'];
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -23,6 +27,16 @@ function TambahUnit({ onUnitAdded, onCancel }) {
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            // Validate file type
+            if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+                setError('Hanya file JPEG, JPG, dan PNG yang diperbolehkan');
+                return;
+            }
+            // Validate file size (2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                setError('Ukuran file maksimal 2MB');
+                return;
+            }
             setSelectedImage(file);
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -34,23 +48,53 @@ function TambahUnit({ onUnitAdded, onCancel }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError(null);
+
+        // Validate kapasitas
+        if (!validKapasitas.includes(formData.kapasitas)) {
+            setError('Kapasitas harus salah satu dari: 2.5, 3, 5, 7, 10');
+            return;
+        }
+
+        // Validate harga_per_jam
+        let harga = formData.harga_per_jam;
+        if (typeof harga === 'string') {
+            harga = harga.replace(/[^\d.]/g, ''); // Hanya angka dan titik
+        }
+        harga = parseFloat(harga);
+        if (isNaN(harga) || harga <= 0) {
+            setError('Harga per jam harus berupa angka positif');
+            return;
+        }
         
         try {
             const formDataWithImage = new FormData();
             Object.keys(formData).forEach(key => {
-                formDataWithImage.append(key, formData[key]);
+                if (key === 'harga_per_jam') {
+                    formDataWithImage.append(key, harga.toString());
+                } else {
+                    formDataWithImage.append(key, formData[key]);
+                }
             });
             
             if (selectedImage) {
                 formDataWithImage.append('gambar', selectedImage);
             }
+
+            // Get token from localStorage
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Authentication required');
+                return;
+            }
             
             await axios.post(
-                'http://localhost:3000/API/unit/store', 
+                'http://localhost:3000/api/unit/store', 
                 formDataWithImage,
                 {
                     headers: {
-                        'Content-Type': 'multipart/form-data'
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`
                     }
                 }
             );
@@ -59,7 +103,8 @@ function TambahUnit({ onUnitAdded, onCancel }) {
             setFormData({
                 nama_unit: '',
                 kapasitas: '',
-                status: 'tersedia'
+                status: 'tersedia',
+                harga_per_jam: ''
             });
             setSelectedImage(null);
             setImagePreview(null);
@@ -67,11 +112,10 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                 fileInputRef.current.value = '';
             }
             
-            // Notify parent component
             onUnitAdded();
         } catch (err) {
             console.error("Error saving unit:", err);
-            setError('Error saving unit: ' + (err.message || 'Unknown error'));
+            setError(err.response?.data?.message || 'Error saving unit');
         }
     };
 
@@ -116,13 +160,33 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                             <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="kapasitas">
                                 Kapasitas (Ton)
                             </label>
-                            <input
-                                type="text"
+                            <select
                                 id="kapasitas"
                                 name="kapasitas"
                                 value={formData.kapasitas}
                                 onChange={handleInputChange}
                                 className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                required
+                            >
+                                <option value="">Pilih Kapasitas</option>
+                                {validKapasitas.map(kap => (
+                                    <option key={kap} value={kap}>{kap} Ton</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="harga_per_jam">
+                                Harga per Jam (Rp)
+                            </label>
+                            <input
+                                type="number"
+                                id="harga_per_jam"
+                                name="harga_per_jam"
+                                value={formData.harga_per_jam}
+                                onChange={handleInputChange}
+                                min="0"
+                                step="0.01"
                                 required
                             />
                         </div>
@@ -140,7 +204,6 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                             >
                                 <option value="tersedia">Tersedia</option>
                                 <option value="disewa">Disewa</option>
-                                <option value="maintenance">Maintenance</option>
                             </select>
                         </div>
                     </div>
@@ -178,7 +241,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                                             name="file-upload" 
                                             type="file" 
                                             className="sr-only"
-                                            accept="image/*"
+                                            accept="image/jpeg,image/png,image/jpg"
                                             ref={fileInputRef}
                                             onChange={handleImageChange}
                                         />
@@ -186,7 +249,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                                     <p className="pl-1">or drag and drop</p>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                    PNG, JPG, GIF up to 10MB
+                                    PNG, JPG, GIF up to 2MB
                                 </p>
                             </div>
                         </div>
