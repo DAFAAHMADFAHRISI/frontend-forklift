@@ -18,7 +18,7 @@ function EditUnit() {
     const { id } = useParams();
     
     // Base URL for images
-    const API_BASE_URL = 'http://localhost:3000/API';
+    const API_BASE_URL = 'http://localhost:4001/api/unit';
 
     // Valid kapasitas values
     const validKapasitas = ['2.5', '3', '5', '7', '10'];
@@ -33,7 +33,7 @@ function EditUnit() {
                     return;
                 }
 
-                const response = await axios.get(`${API_BASE_URL}/unit/${id}`, {
+                const response = await axios.get(`${API_BASE_URL}/${id}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -49,7 +49,7 @@ function EditUnit() {
                     });
                     
                     if (unit.gambar) {
-                        setImagePreview(`${API_BASE_URL}/images/${unit.gambar}`);
+                        setImagePreview(`http://localhost:4001/public/images/${unit.gambar}`);
                     }
                 }
             } catch (err) {
@@ -128,7 +128,7 @@ function EditUnit() {
             }
             
             await axios.put(
-                `${API_BASE_URL}/unit/edit/${id}`, 
+                `${API_BASE_URL}/edit/${id}`,
                 formDataWithImage,
                 {
                     headers: {
@@ -139,7 +139,7 @@ function EditUnit() {
             );
             
             // Navigate back to unit list
-            navigate('/admin/unit');
+            navigate('/admin/units');
         } catch (err) {
             console.error("Error updating unit:", err);
             setError(err.response?.data?.message || 'Error updating unit');

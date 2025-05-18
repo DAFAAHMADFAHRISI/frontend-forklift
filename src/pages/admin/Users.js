@@ -1,5 +1,7 @@
 import React from 'react';
 
+const IMAGE_BASE_URL = 'http://localhost:4001/public/images/';
+
 const Users = () => {
   return (
     <div className="p-6">

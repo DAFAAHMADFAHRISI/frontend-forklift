@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import './Unit.css'; // Pastikan file CSS ini ada
 
 // Config
-const API_BASE_URL = 'http://localhost:3000/API';
-const IMAGE_BASE_URL = 'http://localhost:3000/images/';
+const API_BASE_URL = 'http://localhost:4001/api/unit';
+const IMAGE_BASE_URL = 'http://localhost:4001/public/images/';
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -211,9 +211,9 @@ function Unit() {
     const fetchUnits = async () => {
         try {
             setLoading(true);
-            let endpoint = `${API_BASE_URL}/unit`;
+            let endpoint = `${API_BASE_URL}`;
             if (viewMode === 'available') {
-                endpoint = `${API_BASE_URL}/unit/available`;
+                endpoint = `${API_BASE_URL}/available`;
             }
             const token = localStorage.getItem('token');
             const response = await axios.get(endpoint, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
@@ -243,7 +243,7 @@ function Unit() {
                     setError('Authentication required');
                     return;
                 }
-                await axios.delete(`${API_BASE_URL}/unit/delete/${id}`, {
+                await axios.delete(`${API_BASE_URL}/${id}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -258,7 +258,7 @@ function Unit() {
     const handleStatusChange = async (id, status) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.patch(`${API_BASE_URL}/unit/status/${id}`, 
+            await axios.patch(`${API_BASE_URL}/status/${id}`, 
                 { status },
                 {
                     headers: {
@@ -275,7 +275,7 @@ function Unit() {
 
     const getImageUrl = (imageName) => {
         if (!imageName) return null;
-        return `${API_BASE_URL}/images/${imageName}`;
+        return `${IMAGE_BASE_URL}${imageName}`;
     };
 
     if (loading) return (
@@ -325,7 +325,7 @@ function Unit() {
             <div className="unit-header">
                 <h2>Daftar Unit Forklift</h2>
                 <button 
-                    onClick={() => navigate('/admin/unit/tambah')}
+                    onClick={() => navigate('/admin/units/tambah')}
                     className="add-button"
                 >
                     + Tambah Unit
@@ -375,7 +375,7 @@ function Unit() {
                                 <td>
                                     <div className="action-buttons">
                                         <button
-                                            onClick={() => navigate(`/admin/unit/edit/${unit.id_unit}`)}
+                                            onClick={() => navigate(`/admin/units/edit/${unit.id_unit}`)}
                                             className="action-button edit-button"
                                         >
                                             ✏️ Edit

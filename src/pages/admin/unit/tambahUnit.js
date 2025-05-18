@@ -82,8 +82,9 @@ function TambahUnit() {
                 return;
             }
             
+            const API_BASE_URL = 'http://localhost:4001/api/unit';
             await axios.post(
-                'http://localhost:3000/API/unit/store', 
+                `${API_BASE_URL}/store`,
                 formDataWithImage,
                 {
                     headers: {
@@ -94,7 +95,7 @@ function TambahUnit() {
             );
             
             // Navigate back to unit list
-            navigate('/admin/unit');
+            navigate('/admin/units');
         } catch (err) {
             console.error("Error saving unit:", err);
             setError(err.response?.data?.message || 'Error saving unit');
