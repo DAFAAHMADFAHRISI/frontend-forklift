@@ -4,13 +4,13 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/auth/login';
 import Register from './pages/auth/register';
 import ProtectedRoute from './components/ProtectedRoute';
-
-// Admin Components
 import AdminDashboard from './pages/admin/Dashboard';
-import Users from './pages/admin/Users';
+// Either uncomment and fix the import:
+// import Users from './pages/admin/users/Users';
+// Or remove the Users route if the component doesn't exist
 import Unit from './pages/admin/unit/Unit';
-import TambahUnit from './pages/admin/unit/tambahUnit';
-import EditUnit from './pages/admin/unit/editUnit';
+import TambahUnit from './pages/admin/unit/tambahUnit'; // Fixed case sensitivity
+import EditUnit from './pages/admin/unit/editUnit'; // Fixed case sensitivity
 import Operator from './pages/admin/operator/operator';
 import TambahOperator from './pages/admin/operator/TambahOperator';
 import EditOperator from './pages/admin/operator/EditOperator';
@@ -52,14 +52,15 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
+          {/* Comment out Users route until the component is created */}
+          {/*<Route
             path="/admin/users"
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <Users />
               </ProtectedRoute>
             }
-          />
+          />*/}
           <Route
             path="/admin/units"
             element={

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
 
-function EditUnit({ unit, onUnitUpdated, onCancel }) {
+function EditUnit() {
     const [formData, setFormData] = useState({
         nama_unit: '',
         kapasitas: '',
@@ -12,30 +13,55 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
     const [imagePreview, setImagePreview] = useState(null);
     const fileInputRef = useRef(null);
     const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+    const { id } = useParams();
     
     // Base URL for images
-    const imageBaseUrl = 'http://localhost:3000/images/';
+    const API_BASE_URL = 'http://localhost:3000/API';
 
     // Valid kapasitas values
     const validKapasitas = ['2.5', '3', '5', '7', '10'];
 
-    // Initialize form data when unit prop changes
+    // Fetch unit data
     useEffect(() => {
-        if (unit) {
-            setFormData({
-                nama_unit: unit.nama_unit || '',
-                kapasitas: unit.kapasitas || '',
-                status: unit.status || 'tersedia',
-                harga_per_jam: unit.harga_per_jam || ''
-            });
-            
-            if (unit.gambar) {
-                setImagePreview(imageBaseUrl + unit.gambar);
-            } else {
-                setImagePreview(null);
+        const fetchUnit = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    setError('Authentication required');
+                    return;
+                }
+
+                const response = await axios.get(`${API_BASE_URL}/unit/${id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.data && response.data.status) {
+                    const unit = response.data.data;
+                    setFormData({
+                        nama_unit: unit.nama_unit || '',
+                        kapasitas: unit.kapasitas || '',
+                        status: unit.status || 'tersedia',
+                        harga_per_jam: unit.harga_per_jam || ''
+                    });
+                    
+                    if (unit.gambar) {
+                        setImagePreview(`${API_BASE_URL}/images/${unit.gambar}`);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching unit:", err);
+                setError(err.response?.data?.message || 'Error fetching unit data');
+            } finally {
+                setLoading(false);
             }
-        }
-    }, [unit]);
+        };
+
+        fetchUnit();
+    }, [id]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -70,11 +96,6 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
-        
-        if (!unit || !unit.id_unit) {
-            setError('Unit ID is missing');
-            return;
-        }
 
         // Validate kapasitas
         if (!validKapasitas.includes(formData.kapasitas)) {
@@ -84,7 +105,7 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
 
         // Validate harga_per_jam
         const harga = parseFloat(formData.harga_per_jam);
-        if (isNaN(harga) || harga < 0) {
+        if (isNaN(harga) || harga <= 0) {
             setError('Harga per jam harus berupa angka positif');
             return;
         }
@@ -107,7 +128,7 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
             }
             
             await axios.put(
-                `http://localhost:3000/API/unit/edit/${unit.id_unit}`, 
+                `${API_BASE_URL}/unit/edit/${id}`, 
                 formDataWithImage,
                 {
                     headers: {
@@ -117,28 +138,48 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                 }
             );
             
-            onUnitUpdated();
+            // Navigate back to unit list
+            navigate('/admin/unit');
         } catch (err) {
             console.error("Error updating unit:", err);
             setError(err.response?.data?.message || 'Error updating unit');
         }
     };
 
+    if (loading) {
+        return (
+            <div className="px-6 py-5">
+                <p>Loading unit data...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white border mb-4 p-4">
-            <h3 className="font-semibold mb-3">Edit Unit</h3>
+        <div className="px-6 py-5">
+            <h2 className="text-2xl font-bold mb-4">Edit Unit</h2>
             
             {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 p-2 mb-3">
-                    <p>{error}</p>
+                <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-red-700">
+                                {error}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
             
             <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
-                        <div className="mb-3">
-                            <label className="block text-sm font-medium mb-1" htmlFor="nama_unit">
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="nama_unit">
                                 Nama Unit
                             </label>
                             <input
@@ -147,13 +188,13 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                                 name="nama_unit"
                                 value={formData.nama_unit}
                                 onChange={handleInputChange}
-                                className="w-full border px-2 py-1"
+                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                 required
                             />
                         </div>
                         
-                        <div className="mb-3">
-                            <label className="block text-sm font-medium mb-1" htmlFor="kapasitas">
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="kapasitas">
                                 Kapasitas (Ton)
                             </label>
                             <select
@@ -161,7 +202,7 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                                 name="kapasitas"
                                 value={formData.kapasitas}
                                 onChange={handleInputChange}
-                                className="w-full border px-2 py-1"
+                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                 required
                             >
                                 <option value="">Pilih Kapasitas</option>
@@ -171,8 +212,8 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                             </select>
                         </div>
 
-                        <div className="mb-3">
-                            <label className="block text-sm font-medium mb-1" htmlFor="harga_per_jam">
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="harga_per_jam">
                                 Harga per Jam (Rp)
                             </label>
                             <input
@@ -181,14 +222,15 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                                 name="harga_per_jam"
                                 value={formData.harga_per_jam}
                                 onChange={handleInputChange}
-                                className="w-full border px-2 py-1"
-                                required
                                 min="0"
+                                step="0.01"
+                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                required
                             />
                         </div>
                         
-                        <div className="mb-3">
-                            <label className="block text-sm font-medium mb-1" htmlFor="status">
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="status">
                                 Status
                             </label>
                             <select
@@ -196,7 +238,7 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                                 name="status"
                                 value={formData.status}
                                 onChange={handleInputChange}
-                                className="w-full border px-2 py-1"
+                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                             >
                                 <option value="tersedia">Tersedia</option>
                                 <option value="disewa">Disewa</option>
@@ -205,55 +247,61 @@ function EditUnit({ unit, onUnitUpdated, onCancel }) {
                     </div>
                     
                     <div>
-                        <label className="block text-sm font-medium mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                             Gambar Unit
                         </label>
-                        <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/jpg"
-                            ref={fileInputRef}
-                            onChange={handleImageChange}
-                            className="mb-2"
-                        />
-                        <div className="border flex items-center justify-center bg-gray-100" style={{ height: '150px' }}>
-                            {imagePreview ? (
-                                <img 
-                                    src={imagePreview} 
-                                    alt="Preview" 
-                                    className="max-h-full max-w-full object-contain"
-                                    onError={(e) => {
-                                        console.error("Failed to load image preview:", imagePreview);
-                                        e.target.onerror = null;
-                                        e.target.src = 'https://via.placeholder.com/120x80?text=No+Image';
-                                    }}
-                                />
-                            ) : (
-                                <div className="text-gray-400 text-center p-4">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                        <path d="M20.4 14.5L16 10 4 20"></path>
+                        <div className="mt-1 mb-4 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                            <div className="space-y-1 text-center">
+                                {imagePreview ? (
+                                    <div className="mb-3">
+                                        <img 
+                                            src={imagePreview} 
+                                            alt="Preview" 
+                                            className="mx-auto h-32 w-auto object-contain"
+                                        />
+                                    </div>
+                                ) : (
+                                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
-                                    <p>No Image</p>
+                                )}
+                                
+                                <div className="flex text-sm text-gray-600">
+                                    <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                        <span>Upload a file</span>
+                                        <input 
+                                            id="file-upload" 
+                                            name="file-upload" 
+                                            type="file" 
+                                            className="sr-only"
+                                            accept="image/jpeg,image/png,image/jpg"
+                                            ref={fileInputRef}
+                                            onChange={handleImageChange}
+                                        />
+                                    </label>
+                                    <p className="pl-1">or drag and drop</p>
                                 </div>
-                            )}
+                                <p className="text-xs text-gray-500">
+                                    PNG, JPG, GIF up to 2MB
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <div className="flex">
-                    <button
-                        type="submit"
-                        className="bg-blue-600 text-white px-3 py-1 mr-2"
-                    >
-                        Update
-                    </button>
+                <div className="flex justify-end space-x-3">
                     <button
                         type="button"
-                        onClick={onCancel}
-                        className="bg-gray-300 px-3 py-1"
+                        onClick={() => navigate('/admin/unit')}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                         Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                        Update
                     </button>
                 </div>
             </form>

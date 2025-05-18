@@ -87,12 +87,16 @@ function Operator() {
         }
     };
 
+    const handleAdd = () => {
+        navigate('/admin/operators/tambah');
+    };
+
     const handleEdit = (id) => {
-        navigate(`/operator/edit/${id}`);
+        navigate(`/admin/operators/edit/${id}`);
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to delete this operator?')) {
+        if (window.confirm('Apakah Anda yakin ingin menghapus operator ini?')) {
             try {
                 await axios.delete(`${API_BASE_URL}/operator/delete/${id}`);
                 fetchOperators();
@@ -160,7 +164,7 @@ function Operator() {
             <div className="operator-header">
                 <h2>Daftar Operator</h2>
                 <button 
-                    onClick={() => navigate('/operator/tambah')}
+                    onClick={() => navigate('/admin/operators/tambah')}
                     className="add-button"
                 >
                     + Tambah Operator
@@ -193,7 +197,7 @@ function Operator() {
                                 <td>
                                     <div className="action-buttons">
                                         <button
-                                            onClick={() => handleEdit(operator.id_operator)}
+                                            onClick={() => navigate(`/admin/operators/edit/${operator.id_operator}`)}
                                             className="action-button edit-button"
                                         >
                                             ✏️ Edit

@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import './Unit.css'; // Pastikan file CSS ini ada
 
 // Config
@@ -200,19 +201,8 @@ function Unit() {
     const [units, setUnits] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [formData, setFormData] = useState({
-        nama_unit: '',
-        kapasitas: '',
-        status: 'tersedia',
-        harga_per_jam: ''
-    });
-    const [selectedImage, setSelectedImage] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
-    const fileInputRef = useRef(null);
-    const [isEditing, setIsEditing] = useState(false);
-    const [currentId, setCurrentId] = useState(null);
     const [viewMode, setViewMode] = useState('all');
-    const [showForm, setShowForm] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchUnits();
@@ -221,9 +211,9 @@ function Unit() {
     const fetchUnits = async () => {
         try {
             setLoading(true);
-            let endpoint = `http://localhost:3000/api/unit`;
+            let endpoint = `${API_BASE_URL}/unit`;
             if (viewMode === 'available') {
-                endpoint = `http://localhost:3000/api/unit/available`;
+                endpoint = `${API_BASE_URL}/unit/available`;
             }
             const token = localStorage.getItem('token');
             const response = await axios.get(endpoint, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
@@ -245,124 +235,6 @@ function Unit() {
         }
     };
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({
-            ...formData,
-            [name]: value
-        });
-    };
-
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
-                setError('Hanya file JPEG, JPG, dan PNG yang diperbolehkan');
-                return;
-            }
-            if (file.size > 2 * 1024 * 1024) {
-                setError('Ukuran file maksimal 2MB');
-                return;
-            }
-            setSelectedImage(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError(null);
-        if (!validKapasitas.includes(formData.kapasitas)) {
-            setError('Kapasitas harus salah satu dari: 2.5, 3, 5, 7, 10');
-            return;
-        }
-        const harga = parseFloat(formData.harga_per_jam);
-        if (isNaN(harga) || harga < 0) {
-            setError('Harga per jam harus berupa angka positif');
-            return;
-        }
-        try {
-            const formDataWithImage = new FormData();
-            Object.keys(formData).forEach(key => {
-                formDataWithImage.append(key, formData[key]);
-            });
-            if (selectedImage) {
-                formDataWithImage.append('gambar', selectedImage);
-            }
-            const token = localStorage.getItem('token');
-            if (!token) {
-                setError('Authentication required');
-                return;
-            }
-            if (isEditing) {
-                await axios.put(
-                    `http://localhost:3000/api/unit/edit/${currentId}`,
-                    formDataWithImage,
-                    {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                            'Authorization': `Bearer ${token}`
-                        }
-                    }
-                );
-            } else {
-                await axios.post(
-                    `http://localhost:3000/api/unit/store`,
-                    formDataWithImage,
-                    {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                            'Authorization': `Bearer ${token}`
-                        }
-                    }
-                );
-            }
-            resetForm();
-            fetchUnits();
-        } catch (err) {
-            console.error("Error saving unit:", err);
-            setError(err.response?.data?.message || 'Error saving unit');
-        }
-    };
-
-    const resetForm = () => {
-        setFormData({
-            nama_unit: '',
-            kapasitas: '',
-            status: 'tersedia',
-            harga_per_jam: ''
-        });
-        setSelectedImage(null);
-        setImagePreview(null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-        setIsEditing(false);
-        setCurrentId(null);
-        setShowForm(false);
-    };
-
-    const handleEdit = (unit) => {
-        setFormData({
-            nama_unit: unit.nama_unit || '',
-            kapasitas: unit.kapasitas || '',
-            status: unit.status || 'tersedia',
-            harga_per_jam: unit.harga_per_jam || ''
-        });
-        if (unit.gambar) {
-            setImagePreview(IMAGE_BASE_URL + unit.gambar);
-        } else {
-            setImagePreview(null);
-        }
-        setIsEditing(true);
-        setCurrentId(unit.id_unit);
-        setShowForm(true);
-    };
-
     const handleDelete = async (id) => {
         if (window.confirm('Yakin ingin menghapus unit ini?')) {
             try {
@@ -371,7 +243,7 @@ function Unit() {
                     setError('Authentication required');
                     return;
                 }
-                await axios.delete(`http://localhost:3000/api/unit/${id}`, {
+                await axios.delete(`${API_BASE_URL}/unit/delete/${id}`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -385,7 +257,15 @@ function Unit() {
 
     const handleStatusChange = async (id, status) => {
         try {
-            await axios.patch(`${API_BASE_URL}/unit/status/${id}`, { status });
+            const token = localStorage.getItem('token');
+            await axios.patch(`${API_BASE_URL}/unit/status/${id}`, 
+                { status },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
             fetchUnits();
         } catch (err) {
             console.error("Error updating status:", err);
@@ -395,7 +275,7 @@ function Unit() {
 
     const getImageUrl = (imageName) => {
         if (!imageName) return null;
-        return IMAGE_BASE_URL + imageName;
+        return `${API_BASE_URL}/images/${imageName}`;
     };
 
     if (loading) return (
@@ -445,137 +325,12 @@ function Unit() {
             <div className="unit-header">
                 <h2>Daftar Unit Forklift</h2>
                 <button 
-                    onClick={() => setShowForm(!showForm)}
+                    onClick={() => navigate('/admin/unit/tambah')}
                     className="add-button"
                 >
                     + Tambah Unit
                 </button>
             </div>
-            
-            {/* Form */}
-            {showForm && (
-                <div className="unit-form">
-                    <h3>{isEditing ? 'Edit Unit' : 'Tambah Unit Baru'}</h3>
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-grid">
-                            <div className="form-left">
-                                <div className="form-group">
-                                    <label htmlFor="nama_unit">
-                                        Nama Unit
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="nama_unit"
-                                        name="nama_unit"
-                                        value={formData.nama_unit}
-                                        onChange={handleInputChange}
-                                        required
-                                    />
-                                </div>
-                                
-                                <div className="form-group">
-                                    <label htmlFor="kapasitas">
-                                        Kapasitas (Ton)
-                                    </label>
-                                    <select
-                                        id="kapasitas"
-                                        name="kapasitas"
-                                        value={formData.kapasitas}
-                                        onChange={handleInputChange}
-                                    >
-                                        <option value="2.5">2.5</option>
-                                        <option value="3">3</option>
-                                        <option value="5">5</option>
-                                        <option value="7">7</option>
-                                        <option value="10">10</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="harga_per_jam">
-                                        Harga per Jam (Rp)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        id="harga_per_jam"
-                                        name="harga_per_jam"
-                                        value={formData.harga_per_jam}
-                                        onChange={handleInputChange}
-                                        min="0"
-                                        step="0.01"
-                                        required
-                                    />
-                                </div>
-                                
-                                <div className="form-group">
-                                    <label htmlFor="status">
-                                        Status
-                                    </label>
-                                    <select
-                                        id="status"
-                                        name="status"
-                                        value={formData.status}
-                                        onChange={handleInputChange}
-                                    >
-                                        <option value="tersedia">Tersedia</option>
-                                        <option value="disewa">Disewa</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div className="form-right">
-                                <label>
-                                    Gambar Unit
-                                </label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    ref={fileInputRef}
-                                    onChange={handleImageChange}
-                                />
-                                <div className="image-preview">
-                                    {imagePreview ? (
-                                        <img 
-                                            src={imagePreview} 
-                                            alt="Preview" 
-                                            onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"%3E%3C/rect%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"%3E%3C/circle%3E%3Cpath d="M20.4 14.5L16 10 4 20"%3E%3C/path%3E%3C/svg%3E';
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="no-image">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                                                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                                <path d="M20.4 14.5L16 10 4 20"></path>
-                                            </svg>
-                                            <p>No Image</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="form-buttons">
-                            <button
-                                type="submit"
-                                className="submit-button"
-                            >
-                                {isEditing ? 'Update' : 'Simpan'}
-                            </button>
-                            {isEditing && (
-                                <button
-                                    type="button"
-                                    onClick={resetForm}
-                                    className="cancel-button"
-                                >
-                                    Cancel
-                                </button>
-                            )}
-                        </div>
-                    </form>
-                </div>
-            )}
 
             {/* Table */}
             <table className="unit-table">
@@ -598,13 +353,9 @@ function Unit() {
                                 <td>
                                     <div className="unit-image">
                                         {unit.gambar ? (
-                                            <img 
+                                            <UnitImage 
                                                 src={getImageUrl(unit.gambar)} 
-                                                alt={unit.nama_unit} 
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
-                                                }}
+                                                alt={unit.nama_unit}
                                             />
                                         ) : (
                                             <svg xmlns="http://www.w3.org/2000/svg" className="no-image-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -619,14 +370,12 @@ function Unit() {
                                 <td>{unit.kapasitas}</td>
                                 <td>{unit.harga_per_jam}</td>
                                 <td>
-                                    <span className={`status-badge status-${unit.status}`}>
-                                        {unit.status === 'tersedia' ? 'Tersedia' : 'Disewa'}
-                                    </span>
+                                    <StatusBadge status={unit.status} />
                                 </td>
                                 <td>
                                     <div className="action-buttons">
                                         <button
-                                            onClick={() => handleEdit(unit)}
+                                            onClick={() => navigate(`/admin/unit/edit/${unit.id_unit}`)}
                                             className="action-button edit-button"
                                         >
                                             ✏️ Edit
@@ -646,14 +395,12 @@ function Unit() {
                                                 ✓ Set Tersedia
                                             </button>
                                         ) : (
-                                            <>
-                                                <button
-                                                    onClick={() => handleStatusChange(unit.id_unit, 'disewa')}
-                                                    className="action-button rent-button"
-                                                >
-                                                    ⭐ Set Disewa
-                                                </button>
-                                            </>
+                                            <button
+                                                onClick={() => handleStatusChange(unit.id_unit, 'disewa')}
+                                                className="action-button rent-button"
+                                            >
+                                                ⭐ Set Disewa
+                                            </button>
                                         )}
                                     </div>
                                 </td>

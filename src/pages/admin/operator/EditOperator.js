@@ -24,21 +24,94 @@ function EditOperator() {
     const fetchOperator = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_BASE_URL}/operator/${id}`);
-            
-            if (response.data && response.data.status && response.data.data) {
-                const operatorData = response.data.data;
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Token tidak ditemukan. Silakan login kembali.');
+                return;
+            }
+
+            const response = await axios.get(`${API_BASE_URL}/operator/${id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            // Fallback: use data field if present, otherwise use the response object itself
+            let operatorData = response.data.data;
+            if (!operatorData) {
+                // Try to find operator data directly in the response (excluding status/message)
+                const { status, message, ...rest } = response.data;
+                // If rest has keys, assume it's the operator data
+                if (Object.keys(rest).length > 0) {
+                    operatorData = rest;
+                } else {
+                    operatorData = null;
+                }
+            }
+
+            if (operatorData && (operatorData.nama_operator || operatorData.no_hp)) {
                 setFormData({
-                    nama_operator: operatorData.nama_operator || '',
-                    no_hp: operatorData.no_hp || '',
+                    nama_operator: operatorData.nama_operator || operatorData.nama || '',
+                    no_hp: operatorData.no_hp || operatorData.nomor_hp || '',
                     status: operatorData.status || 'tersedia'
                 });
             } else {
-                setError('Failed to fetch operator data: ' + (response.data?.message || 'Unknown error'));
+                setError('Data operator tidak ditemukan atau format tidak valid.');
             }
         } catch (err) {
-            console.error("Error fetching operator:", err);
-            setError('Error fetching operator: ' + (err.message || 'Unknown error'));
+            console.error("Error details:", {
+                message: err.message,
+                response: err.response?.data,
+                status: err.response?.status
+            });
+
+            if (err.response) {
+                if (err.response.status === 404) {
+                    setError('Operator tidak ditemukan');
+                } else {
+                    setError('Error: ' + (err.response.data?.message || err.message));
+                }
+            } else {
+                setError('Error mengambil data operator: ' + err.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Token tidak ditemukan. Silakan login kembali.');
+                return;
+            }
+
+            const response = await axios.put(
+                `${API_BASE_URL}/operator/edit/${id}`, 
+                formData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+            
+            if (response.data && response.data.status) {
+                navigate('/admin/operators');
+            } else {
+                setError('Gagal memperbarui operator: ' + (response.data?.message || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error("Error updating operator:", err);
+            if (err.response) {
+                setError('Error: ' + (err.response.data?.message || err.message));
+            } else {
+                setError('Error memperbarui operator: ' + err.message);
+            }
         } finally {
             setLoading(false);
         }
@@ -50,25 +123,6 @@ function EditOperator() {
             ...formData,
             [name]: value
         });
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        try {
-            setLoading(true);
-            await axios.patch(
-                `${API_BASE_URL}/operator/update/${id}`, 
-                formData
-            );
-            
-            navigate('/operator'); // Redirect back to operator list
-        } catch (err) {
-            console.error("Error updating operator:", err);
-            setError('Error updating operator: ' + (err.message || 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
     };
 
     if (loading) return (
@@ -86,7 +140,7 @@ function EditOperator() {
             <div className="error-container">
                 <p>Error: {error}</p>
                 <button 
-                    onClick={() => navigate('/operator')}
+                    onClick={() => navigate('/admin/operators')}
                     className="retry-button"
                 >
                     Kembali
@@ -155,10 +209,10 @@ function EditOperator() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => navigate('/operator')}
+                            onClick={() => navigate('/admin/operators')}
                             className="cancel-button"
                         >
-                            Batal
+                            Cancel
                         </button>
                     </div>
                 </form>

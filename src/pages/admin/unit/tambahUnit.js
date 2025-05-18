@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
-function TambahUnit({ onUnitAdded, onCancel }) {
+function TambahUnit() {
     const [formData, setFormData] = useState({
         nama_unit: '',
         kapasitas: '',
@@ -12,6 +13,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
     const [imagePreview, setImagePreview] = useState(null);
     const fileInputRef = useRef(null);
     const [error, setError] = useState(null);
+    const navigate = useNavigate();
 
     // Valid kapasitas values
     const validKapasitas = ['2.5', '3', '5', '7', '10'];
@@ -57,11 +59,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
         }
 
         // Validate harga_per_jam
-        let harga = formData.harga_per_jam;
-        if (typeof harga === 'string') {
-            harga = harga.replace(/[^\d.]/g, ''); // Hanya angka dan titik
-        }
-        harga = parseFloat(harga);
+        const harga = parseFloat(formData.harga_per_jam);
         if (isNaN(harga) || harga <= 0) {
             setError('Harga per jam harus berupa angka positif');
             return;
@@ -70,11 +68,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
         try {
             const formDataWithImage = new FormData();
             Object.keys(formData).forEach(key => {
-                if (key === 'harga_per_jam') {
-                    formDataWithImage.append(key, harga.toString());
-                } else {
-                    formDataWithImage.append(key, formData[key]);
-                }
+                formDataWithImage.append(key, formData[key]);
             });
             
             if (selectedImage) {
@@ -89,7 +83,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
             }
             
             await axios.post(
-                'http://localhost:3000/api/unit/store', 
+                'http://localhost:3000/API/unit/store', 
                 formDataWithImage,
                 {
                     headers: {
@@ -99,20 +93,8 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                 }
             );
             
-            // Reset form
-            setFormData({
-                nama_unit: '',
-                kapasitas: '',
-                status: 'tersedia',
-                harga_per_jam: ''
-            });
-            setSelectedImage(null);
-            setImagePreview(null);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-            
-            onUnitAdded();
+            // Navigate back to unit list
+            navigate('/admin/unit');
         } catch (err) {
             console.error("Error saving unit:", err);
             setError(err.response?.data?.message || 'Error saving unit');
@@ -121,6 +103,8 @@ function TambahUnit({ onUnitAdded, onCancel }) {
 
     return (
         <div className="px-6 py-5">
+            <h2 className="text-2xl font-bold mb-4">Tambah Unit Baru</h2>
+            
             {error && (
                 <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
                     <div className="flex">
@@ -187,6 +171,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                                 onChange={handleInputChange}
                                 min="0"
                                 step="0.01"
+                                className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                 required
                             />
                         </div>
@@ -220,11 +205,6 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                                             src={imagePreview} 
                                             alt="Preview" 
                                             className="mx-auto h-32 w-auto object-contain"
-                                            onError={(e) => {
-                                                console.error("Failed to load image preview:", imagePreview);
-                                                e.target.onerror = null;
-                                                e.target.src = 'https://via.placeholder.com/120x80?text=No+Image';
-                                            }}
                                         />
                                     </div>
                                 ) : (
@@ -259,7 +239,7 @@ function TambahUnit({ onUnitAdded, onCancel }) {
                 <div className="flex justify-end space-x-3">
                     <button
                         type="button"
-                        onClick={onCancel}
+                        onClick={() => navigate('/admin/unit')}
                         className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                         Cancel

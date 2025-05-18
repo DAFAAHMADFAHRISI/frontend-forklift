@@ -34,10 +34,10 @@ function TambahOperator() {
                 formData
             );
             
-            navigate('/operator'); // Redirect back to operator list
+            navigate('/admin/operators');
         } catch (err) {
             console.error("Error saving operator:", err);
-            setError('Error saving operator: ' + (err.message || 'Unknown error'));
+            setError('Error menyimpan operator: ' + (err.message || 'Unknown error'));
         } finally {
             setLoading(false);
         }
@@ -58,7 +58,7 @@ function TambahOperator() {
             <div className="error-container">
                 <p>Error: {error}</p>
                 <button 
-                    onClick={() => navigate('/operator')}
+                    onClick={() => navigate('/admin/operators')}
                     className="retry-button"
                 >
                     Kembali
@@ -127,10 +127,10 @@ function TambahOperator() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => navigate('/operator')}
+                            onClick={() => navigate('/admin/operators')}
                             className="cancel-button"
                         >
-                            Batal
+                            Cancel
                         </button>
                     </div>
                 </form>
